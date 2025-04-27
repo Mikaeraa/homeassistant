@@ -1,65 +1,47 @@
 blueprint:
-  name: RF Contact Sensor “Learn Mode”
-  description: >
-    Learns two 433 MHz codes (open/closed) from your RF Last Code text_sensor.
-    First unique code → Open. Second unique code → Closed.
+  name: RF Code to Contact Sensor Toggle
+  description: |
+    Listens for RF codes on a sensor (e.g., sensor.rf_last_code).
+    If the code matches one of the two configured codes, toggles an input_boolean (virtual contact sensor).
   domain: automation
   input:
-    rf_code_sensor:
-      name: RF Last Code Sensor
-      description: The text_sensor that shows the last 24-bit RF code.
+    rf_sensor:
+      name: RF Sensor
+      description: The sensor that receives RF codes (e.g., sensor.rf_last_code).
       selector:
         entity:
-          domain: text_sensor
-    open_code_helper:
-      name: Open Code Helper
-      description: input_text helper to store the “open” code.
+          domain: sensor
+    code_1:
+      name: RF Code 1
+      description: First RF code to listen for.
+      selector:
+        text:
+    code_2:
+      name: RF Code 2
+      description: (Optional) Second RF code to listen for.
+      default: ''
+      selector:
+        text:
+    target_device:
+      name: Target Device (Input Boolean)
+      description: The input_boolean to toggle.
       selector:
         entity:
-          domain: input_text
-    closed_code_helper:
-      name: Closed Code Helper
-      description: input_text helper to store the “closed” code.
-      selector:
-        entity:
-          domain: input_text
+          domain: input_boolean
 
 trigger:
   - platform: state
-    entity_id: !input rf_code_sensor
+    entity_id: !input rf_sensor
 
-variables:
-  code: "{{ trigger.to_state.state }}"
-  open_code: "{{ states( (input.open_code_helper) ) }}"
-  closed_code: "{{ states( (input.closed_code_helper) ) }}"
+condition:
+  - condition: template
+    value_template: >-
+      {{ trigger.to_state.state == (iif((!input code_1 == ''), (!input code_1), 'none')) 
+         or trigger.to_state.state == (iif((!input code_2 == ''), (!input code_2), 'none')) }}
 
 action:
-  - choose:
-      # 1) Learn Open code if empty
-      - conditions:
-          - "{{ open_code == '' }}"
-        sequence:
-          - service: input_text.set_value
-            target:
-              entity_id: !input open_code_helper
-            data:
-              value: "{{ code }}"
-          - service: persistent_notification.create
-            data:
-              title: "RF Learn Mode: Open code saved"
-              message: "Saved Open code → **{{ code }}**"
-      # 2) Then learn Closed code if different & empty
-      - conditions:
-          - "{{ open_code != '' and closed_code == '' and code != open_code }}"
-        sequence:
-          - service: input_text.set_value
-            target:
-              entity_id: !input closed_code_helper
-            data:
-              value: "{{ code }}"
-          - service: persistent_notification.create
-            data:
-              title: "RF Learn Mode: Closed code saved"
-              message: "Saved Closed code → **{{ code }}**"
-  # 3) (optional) you could reset helpers by clearing both inputs if both are set
-mode: single
+  - service: input_boolean.toggle
+    target:
+      entity_id: !input target_device
+
+mode: restart
