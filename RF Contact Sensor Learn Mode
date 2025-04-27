@@ -1,0 +1,65 @@
+blueprint:
+  name: RF Contact Sensor “Learn Mode”
+  description: >
+    Learns two 433 MHz codes (open/closed) from your RF Last Code text_sensor.
+    First unique code → Open. Second unique code → Closed.
+  domain: automation
+  input:
+    rf_code_sensor:
+      name: RF Last Code Sensor
+      description: The text_sensor that shows the last 24-bit RF code.
+      selector:
+        entity:
+          domain: text_sensor
+    open_code_helper:
+      name: Open Code Helper
+      description: input_text helper to store the “open” code.
+      selector:
+        entity:
+          domain: input_text
+    closed_code_helper:
+      name: Closed Code Helper
+      description: input_text helper to store the “closed” code.
+      selector:
+        entity:
+          domain: input_text
+
+trigger:
+  - platform: state
+    entity_id: !input rf_code_sensor
+
+variables:
+  code: "{{ trigger.to_state.state }}"
+  open_code: "{{ states( (input.open_code_helper) ) }}"
+  closed_code: "{{ states( (input.closed_code_helper) ) }}"
+
+action:
+  - choose:
+      # 1) Learn Open code if empty
+      - conditions:
+          - "{{ open_code == '' }}"
+        sequence:
+          - service: input_text.set_value
+            target:
+              entity_id: !input open_code_helper
+            data:
+              value: "{{ code }}"
+          - service: persistent_notification.create
+            data:
+              title: "RF Learn Mode: Open code saved"
+              message: "Saved Open code → **{{ code }}**"
+      # 2) Then learn Closed code if different & empty
+      - conditions:
+          - "{{ open_code != '' and closed_code == '' and code != open_code }}"
+        sequence:
+          - service: input_text.set_value
+            target:
+              entity_id: !input closed_code_helper
+            data:
+              value: "{{ code }}"
+          - service: persistent_notification.create
+            data:
+              title: "RF Learn Mode: Closed code saved"
+              message: "Saved Closed code → **{{ code }}**"
+  # 3) (optional) you could reset helpers by clearing both inputs if both are set
+mode: single
