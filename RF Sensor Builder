@@ -1,16 +1,10 @@
 blueprint:
-  name: RF Code to Contact Sensor Toggle
+  name: RF Code to Contact Sensor Toggle (Fixed Sensor)
   description: |
-    Listens for RF codes on a sensor (e.g., sensor.rf_last_code).
+    Listens for RF codes on sensor.rf_last_code.
     If the code matches one of the two configured codes, toggles an input_boolean (virtual contact sensor).
   domain: automation
   input:
-    rf_sensor:
-      name: RF Sensor
-      description: The sensor that receives RF codes (e.g., sensor.rf_last_code).
-      selector:
-        entity:
-          domain: sensor
     code_1:
       name: RF Code 1
       description: First RF code to listen for.
@@ -31,14 +25,12 @@ blueprint:
 
 trigger:
   - platform: state
-    entity_id: !input rf_sensor
+    entity_id: sensor.rf_last_code
 
 condition:
   - condition: template
     value_template: >-
-      {% set code1 = (states('' + ('' + !input code_1))) %}
-      {% set code2 = (states('' + ('' + !input code_2))) %}
-      {{ trigger.to_state.state == code1 or trigger.to_state.state == code2 }}
+      {{ trigger.to_state.state == !input code_1 or ( !input code_2 != '' and trigger.to_state.state == !input code_2 ) }}
 
 action:
   - service: input_boolean.toggle
